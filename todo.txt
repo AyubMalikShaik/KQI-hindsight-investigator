@@ -95,13 +95,13 @@ Done
 Remaining
 Rough completion share of the Architecture.html priority table (not hours). P1 remainder is almost entirely live Streamlit.
 
-Recommended next steps (priority order)
+Recommended next steps (priority order & completion status)
 
-1. Make Streamlit start an investigation (scenario picker + live timeline from on_event). This is the 60s demo centerpiece the architecture promised.
-2. Render Evidence.chart (ChartSpec) with Plotly — especially the dimension waterfall. Specs are already produced; the UI ignores them.
-3. Alert inbox: list SCN-001–004 with severity and one-click Investigate. Skip FastAPI until after the demo.
-4. Write README: architecture diagram, how to seed bank / run / streamlit, env vars, documented production roadmap. Required for submission. [DONE]
-5. Pin dependencies (requirements.txt or pyproject.toml) so a judge can recreate the venv.
+1. [DONE] Make Streamlit start an investigation (scenario picker + live timeline from on_event). This is the 60s demo centerpiece the architecture promised.
+2. [DONE] Render Evidence.chart (ChartSpec) with Plotly — especially the dimension waterfall.
+3. [DONE] Alert inbox: list SCN-001–004 with severity and one-click Investigate.
+4. [DONE] Write README: architecture diagram, how to seed bank / run / streamlit, env vars, documented production roadmap.
+5. [DONE] Pin dependencies (requirements.txt) so a judge can recreate the venv.
 6. Rehearse the 3–4 min script: cold SCN-002 or 001 with full seed, similar incident, SCN-003 false alarm, learning-curve tab.
 7. Record demo video + keep a recorded fallback run if Groq/Hindsight DNS flaps mid-live-demo.
 8. Optional P2: expose analyze_logs as its own tool (log_signatures already exist and are partially pulled into events).
