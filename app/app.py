@@ -500,10 +500,10 @@ def main() -> None:
         selected_scenario = st.selectbox(
             "Select Scenario Alert",
             options=sorted(SCENARIOS.keys()),
-            format_func=lambda s: f"{s}: {SCENARIOS[s].name}",
+            format_func=lambda s: f"{s}: {SCENARIOS[s].title}",
         )
         scenario_meta = SCENARIOS[selected_scenario]
-        st.info(f"**Metric:** {scenario_meta.metric}\n\n**Cause:** {scenario_meta.planted_cause_type}")
+        st.info(f"**Title:** {scenario_meta.title}\n\n**Cause Type:** {scenario_meta.truth.cause_type}")
 
         use_memory = st.checkbox("Enable Hindsight Memory", value=True)
         if st.button("🚀 Start Live Investigation", type="primary"):
