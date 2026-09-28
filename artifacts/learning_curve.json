@@ -1,0 +1,291 @@
+{
+  "sizes": [
+    0,
+    2,
+    4,
+    6,
+    8
+  ],
+  "scenarios": [
+    "SCN-001",
+    "SCN-002",
+    "SCN-003",
+    "SCN-004"
+  ],
+  "cases": [
+    {
+      "document_id": "case-2026-04-28-festival-demand",
+      "occurred_at": "2026-04-28T18:00:00+00:00"
+    },
+    {
+      "document_id": "case-2026-05-12-us-card-decline",
+      "occurred_at": "2026-05-12T08:00:00+00:00"
+    },
+    {
+      "document_id": "case-2026-05-20-card-retry-config-push",
+      "occurred_at": "2026-05-20T07:30:00+00:00"
+    },
+    {
+      "document_id": "case-2026-06-15-upi-keepalive-push",
+      "occurred_at": "2026-06-15T09:00:00+00:00"
+    },
+    {
+      "document_id": "case-2026-06-30-revenue-recognition-tax-schema",
+      "occurred_at": "2026-06-30T04:00:00+00:00"
+    },
+    {
+      "document_id": "case-2026-07-03-checkout-deploy",
+      "occurred_at": "2026-07-03T14:00:00+00:00"
+    },
+    {
+      "document_id": "case-2026-07-21-paid-channel-misdiagnosed",
+      "occurred_at": "2026-07-21T11:00:00+00:00"
+    },
+    {
+      "document_id": "case-2026-08-19-payment-partner-outage",
+      "occurred_at": "2026-08-19T02:00:00+00:00"
+    }
+  ],
+  "results": [
+    {
+      "size": 0,
+      "scenario": "SCN-001",
+      "correct": false,
+      "cause_type": "payment_failure",
+      "mechanism": "-",
+      "confidence": 0.85,
+      "priors": 0,
+      "prior_relevance": 0.0,
+      "tool_calls": 8,
+      "evidence": 8
+    },
+    {
+      "size": 0,
+      "scenario": "SCN-002",
+      "correct": true,
+      "cause_type": "config_change",
+      "mechanism": "payment.upi.conn_pool_max",
+      "confidence": 0.85,
+      "priors": 0,
+      "prior_relevance": 0.0,
+      "tool_calls": 9,
+      "evidence": 9
+    },
+    {
+      "size": 0,
+      "scenario": "SCN-003",
+      "correct": true,
+      "cause_type": "data_quality",
+      "mechanism": "-",
+      "confidence": 0.53,
+      "priors": 0,
+      "prior_relevance": 0.0,
+      "tool_calls": 8,
+      "evidence": 8
+    },
+    {
+      "size": 0,
+      "scenario": "SCN-004",
+      "correct": true,
+      "cause_type": "traffic_loss",
+      "mechanism": "-",
+      "confidence": 0.77,
+      "priors": 0,
+      "prior_relevance": 0.0,
+      "tool_calls": 7,
+      "evidence": 7
+    },
+    {
+      "size": 2,
+      "scenario": "SCN-001",
+      "correct": false,
+      "cause_type": "payment_failure",
+      "mechanism": "-",
+      "confidence": 0.892,
+      "priors": 4,
+      "prior_relevance": 0.698,
+      "tool_calls": 8,
+      "evidence": 8
+    },
+    {
+      "size": 2,
+      "scenario": "SCN-002",
+      "correct": true,
+      "cause_type": "config_change",
+      "mechanism": "payment.upi.conn_pool_max",
+      "confidence": 0.85,
+      "priors": 0,
+      "prior_relevance": 0.0,
+      "tool_calls": 9,
+      "evidence": 9
+    },
+    {
+      "size": 2,
+      "scenario": "SCN-003",
+      "correct": true,
+      "cause_type": "data_quality",
+      "mechanism": "-",
+      "confidence": 0.53,
+      "priors": 0,
+      "prior_relevance": 0.0,
+      "tool_calls": 8,
+      "evidence": 8
+    },
+    {
+      "size": 2,
+      "scenario": "SCN-004",
+      "correct": true,
+      "cause_type": "traffic_loss",
+      "mechanism": "-",
+      "confidence": 0.812,
+      "priors": 2,
+      "prior_relevance": 0.698,
+      "tool_calls": 7,
+      "evidence": 7
+    },
+    {
+      "size": 4,
+      "scenario": "SCN-001",
+      "correct": false,
+      "cause_type": "payment_failure",
+      "mechanism": "-",
+      "confidence": 0.892,
+      "priors": 4,
+      "prior_relevance": 0.698,
+      "tool_calls": 8,
+      "evidence": 8
+    },
+    {
+      "size": 4,
+      "scenario": "SCN-002",
+      "correct": true,
+      "cause_type": "config_change",
+      "mechanism": "payment.upi.keepalive_ms",
+      "confidence": 0.892,
+      "priors": 5,
+      "prior_relevance": 0.698,
+      "tool_calls": 9,
+      "evidence": 9
+    },
+    {
+      "size": 4,
+      "scenario": "SCN-003",
+      "correct": true,
+      "cause_type": "data_quality",
+      "mechanism": "-",
+      "confidence": 0.53,
+      "priors": 0,
+      "prior_relevance": 0.0,
+      "tool_calls": 8,
+      "evidence": 8
+    },
+    {
+      "size": 4,
+      "scenario": "SCN-004",
+      "correct": true,
+      "cause_type": "traffic_loss",
+      "mechanism": "-",
+      "confidence": 0.812,
+      "priors": 2,
+      "prior_relevance": 0.698,
+      "tool_calls": 7,
+      "evidence": 7
+    },
+    {
+      "size": 6,
+      "scenario": "SCN-001",
+      "correct": true,
+      "cause_type": "release_regression",
+      "mechanism": "v4.12.0",
+      "confidence": 0.898,
+      "priors": 5,
+      "prior_relevance": 0.794,
+      "tool_calls": 8,
+      "evidence": 8
+    },
+    {
+      "size": 6,
+      "scenario": "SCN-002",
+      "correct": true,
+      "cause_type": "config_change",
+      "mechanism": "payment.upi.keepalive_ms",
+      "confidence": 0.887,
+      "priors": 4,
+      "prior_relevance": 0.616,
+      "tool_calls": 9,
+      "evidence": 9
+    },
+    {
+      "size": 6,
+      "scenario": "SCN-003",
+      "correct": true,
+      "cause_type": "data_quality",
+      "mechanism": "-",
+      "confidence": 0.576,
+      "priors": 3,
+      "prior_relevance": 0.768,
+      "tool_calls": 8,
+      "evidence": 8
+    },
+    {
+      "size": 6,
+      "scenario": "SCN-004",
+      "correct": true,
+      "cause_type": "traffic_loss",
+      "mechanism": "-",
+      "confidence": 0.812,
+      "priors": 3,
+      "prior_relevance": 0.698,
+      "tool_calls": 7,
+      "evidence": 7
+    },
+    {
+      "size": 8,
+      "scenario": "SCN-001",
+      "correct": true,
+      "cause_type": "release_regression",
+      "mechanism": "v4.12.0",
+      "confidence": 0.899,
+      "priors": 4,
+      "prior_relevance": 0.819,
+      "tool_calls": 8,
+      "evidence": 8
+    },
+    {
+      "size": 8,
+      "scenario": "SCN-002",
+      "correct": true,
+      "cause_type": "config_change",
+      "mechanism": "payment.upi.keepalive_ms",
+      "confidence": 0.892,
+      "priors": 3,
+      "prior_relevance": 0.698,
+      "tool_calls": 9,
+      "evidence": 9
+    },
+    {
+      "size": 8,
+      "scenario": "SCN-003",
+      "correct": true,
+      "cause_type": "data_quality",
+      "mechanism": "-",
+      "confidence": 0.576,
+      "priors": 3,
+      "prior_relevance": 0.768,
+      "tool_calls": 8,
+      "evidence": 8
+    },
+    {
+      "size": 8,
+      "scenario": "SCN-004",
+      "correct": true,
+      "cause_type": "traffic_loss",
+      "mechanism": "-",
+      "confidence": 0.812,
+      "priors": 4,
+      "prior_relevance": 0.698,
+      "tool_calls": 7,
+      "evidence": 7
+    }
+  ]
+}

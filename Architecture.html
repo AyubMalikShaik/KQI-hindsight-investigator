@@ -1,0 +1,629 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}</style><style>:root{color-scheme:light dark;--md-bg:#fff;--md-text:rgba(0,0,0,.8);--md-muted:rgba(0,0,0,.6);--md-fill:rgba(0,0,0,.04);--md-fill-strong:rgba(0,0,0,.06);--md-rule:rgba(0,0,0,.1);--md-rule-strong:rgba(0,0,0,.16);--md-link:hsl(210 100% 45%)}@media (prefers-color-scheme:dark){:root:where(:not([data-theme="light"])){--md-bg:#0d0d0d;--md-text:rgba(255,255,255,.85);--md-muted:rgba(255,255,255,.6);--md-fill:rgba(255,255,255,.06);--md-fill-strong:rgba(255,255,255,.09);--md-rule:rgba(255,255,255,.14);--md-rule-strong:rgba(255,255,255,.22);--md-link:hsl(210 100% 72%)}}:root[data-theme="dark"]{color-scheme:dark;--md-bg:#0d0d0d;--md-text:rgba(255,255,255,.85);--md-muted:rgba(255,255,255,.6);--md-fill:rgba(255,255,255,.06);--md-fill-strong:rgba(255,255,255,.09);--md-rule:rgba(255,255,255,.14);--md-rule-strong:rgba(255,255,255,.22);--md-link:hsl(210 100% 72%)}:root[data-theme="light"]{color-scheme:light}@media print{:root,:root[data-theme="dark"]{color-scheme:light;--md-bg:#fff;--md-text:rgba(0,0,0,.8);--md-muted:rgba(0,0,0,.6);--md-fill:rgba(0,0,0,.04);--md-fill-strong:rgba(0,0,0,.06);--md-rule:rgba(0,0,0,.1);--md-rule-strong:rgba(0,0,0,.16);--md-link:hsl(210 100% 45%)}}body{background:var(--md-bg);color:var(--md-text);max-width:720px;margin:0 auto;padding:32px;display:flex;flex-direction:column;gap:10px;font:14px/1.55 -apple-system,BlinkMacSystemFont,'SF Pro','Segoe UI',sans-serif;overflow-wrap:break-word}body>:first-child{margin-top:0}h1,h2,h3,h4,h5,h6{margin:6px 0 0;line-height:1.25;font-weight:600;text-wrap:balance}h1{font-size:1.35em}h2{font-size:1.15em;color:var(--md-muted)}h3,h4,h5,h6{font-size:1em}p,ul,ol,blockquote,table,pre,hr{margin:0}strong{font-weight:600}a{color:var(--md-link);text-decoration:none}a:hover{text-decoration:underline}ul,ol{display:flex;flex-direction:column;gap:6px;padding-left:22px}ul{list-style:disc}ol{list-style:decimal}:is(li,td,th)>*+:is(p,ul,ol,blockquote){margin-top:6px}blockquote{display:flex;flex-direction:column;gap:10px;border-left:2px solid var(--md-rule);padding-left:10px;color:var(--md-muted)}:not(pre)>code{background:var(--md-fill);padding:1px 3px;border-radius:4px;font:.92em 'SF Mono',ui-monospace,Menlo,Consolas,monospace}a>code{background:none;color:inherit}pre{background:var(--md-fill);padding:10px 12px;border-radius:6px;overflow-x:auto;font:12px/1.5 'SF Mono',ui-monospace,Menlo,Consolas,monospace;margin-block:4px}pre code{background:none;padding:0;font:inherit}table{width:100%;border-collapse:separate;border-spacing:2px;font:inherit}th,td{padding:6px 8px;border-radius:3px;text-align:left;vertical-align:top}th{background:var(--md-fill-strong);font-weight:600}td{background:var(--md-fill)}:is(th,td) :not(pre)>code{background:transparent}hr{border:0;border-top:1px solid var(--md-rule-strong);margin-block:10px}img{max-width:100%;height:auto;border-radius:4px}</style>
+</head><body>
+<h1>Business Anomaly Investigator: Technical Architecture</h1>
+<p><strong>One-line pitch:</strong> An autonomous investigation agent that turns a KPI alert into an evidence-backed root-cause report, and gets measurably better with every investigation because it remembers outcomes (Hindsight).</p>
+<p><strong>Winning angle:</strong> Most &quot;AI analyst&quot; demos are chat-over-SQL. Yours is different in three ways: (1) it is <em>triggered by alerts</em>, not questions; (2) it <em>validates hypotheses with evidence</em> instead of guessing; (3) it <em>learns from human-confirmed outcomes</em>. Build the architecture around these three ideas.</p>
+<hr>
+<h2>0. Hackathon Alignment (Rules and Judging)</h2>
+<table>
+<thead>
+<tr>
+<th>Requirement</th>
+<th>How this design meets it</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Must use Hindsight</td>
+<td><code>MemoryService</code> wraps retain / recall / reflect; memory drives hypotheses</td>
+</tr>
+<tr>
+<td>Memory central and visible (25%)</td>
+<td>Backfilled history, two-stage retain, learning-curve chart, recalled memories shown on screen every run</td>
+</tr>
+<tr>
+<td>Innovation (30%)</td>
+<td>Alert-triggered <em>business KPI</em> root-cause agent with falsifiable hypotheses, not a chatbot and not infra incident response</td>
+</tr>
+<tr>
+<td>Technical implementation (20%)</td>
+<td>Typed tools, <code>ToolCallGuard</code> for function-calling errors, model fallback, bounded state machine, eval harness</td>
+</tr>
+<tr>
+<td>UX (15%)</td>
+<td>Live investigation timeline, driver waterfall, feedback panel, 3-minute story demo</td>
+</tr>
+<tr>
+<td>Real-world impact (10%)</td>
+<td>Adoption path in section 8, measured time-saved numbers</td>
+</tr>
+<tr>
+<td>Realistic data</td>
+<td>Real Kaggle base dataset plus LLM-generated events and logs (see L5)</td>
+</tr>
+<tr>
+<td>Tight scope</td>
+<td>Build only the &quot;Build&quot; column in section 5; the rest is a documented roadmap</td>
+</tr>
+<tr>
+<td>Submission</td>
+<td>Repo, demo video, live demo, <code>docs/hindsight_usage.md</code>, article, social post, video (section 9)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Positioning:</strong> this is <em>not</em> the &quot;Incident Response Agent&quot; from the brief's idea list. That one handles infrastructure outages. This one investigates <strong>business KPI anomalies</strong> (revenue, conversion, churn) across data, events and logs. Say this in the first sentence of your pitch.</p>
+<hr>
+<h2>1. Layered Architecture (Overview)</h2>
+<pre class="mermaid">flowchart TD
+  A[L1 Ingestion: Alert API / Webhook / Simulator] --&gt; B[L2 Orchestrator: Investigation State Machine]
+  B --&gt; C[L3 Agent Core: LLM + Function Calling]
+  C --&gt; D[L4 Tool Layer: Metric, Dimension, Related, Events, Logs]
+  D --&gt; E[L5 Data Layer: DuckDB / SQLite / CSV / Parquet]
+  C &lt;--&gt; F[L6 Memory Layer: Hindsight recall / retain / reflect]
+  C --&gt; G[L7 Validation and Guardrails: evidence scoring, confidence]
+  G --&gt; H[L8 Report Generator: structured JSON + narrative]
+  H --&gt; I[L9 Experience Layer: Streamlit + Plotly]
+  I --&gt; J[Human Feedback: confirm / reject cause, action taken, outcome]
+  J --&gt; F
+  K[L10 Platform: config, observability, audit, security, eval] -.-&gt; B
+  K -.-&gt; C
+</pre>
+<table>
+<thead>
+<tr>
+<th>Layer</th>
+<th>Responsibility</th>
+<th>Tech</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>L1 Ingestion</td>
+<td>Receive anomaly alerts from any monitoring system, normalize to one schema</td>
+<td>FastAPI webhook (or Streamlit button for demo), Pydantic</td>
+</tr>
+<tr>
+<td>L2 Orchestrator</td>
+<td>Runs the investigation lifecycle, budgets, retries, timeouts</td>
+<td>Python state machine</td>
+</tr>
+<tr>
+<td>L3 Agent Core</td>
+<td>Plans, calls tools, forms and tests hypotheses</td>
+<td>Groq LLM (function calling)</td>
+</tr>
+<tr>
+<td>L4 Tool Layer</td>
+<td>Deterministic, generic, typed analysis functions</td>
+<td>Python + Pandas + DuckDB</td>
+</tr>
+<tr>
+<td>L5 Data Layer</td>
+<td>KPI facts, dimensions, related metrics, business events, logs</td>
+<td>DuckDB / SQLite</td>
+</tr>
+<tr>
+<td>L6 Memory</td>
+<td>Store and recall past investigations, causes, actions, outcomes</td>
+<td>Hindsight Cloud + hindsight-client</td>
+</tr>
+<tr>
+<td>L7 Validation</td>
+<td>Score evidence, reject weak hypotheses, compute confidence</td>
+<td>Python rules + LLM critic</td>
+</tr>
+<tr>
+<td>L8 Report</td>
+<td>Structured, auditable output</td>
+<td>Pydantic to JSON, Markdown</td>
+</tr>
+<tr>
+<td>L9 Experience</td>
+<td>Live investigation view, report, feedback</td>
+<td>Streamlit, Plotly</td>
+</tr>
+<tr>
+<td>L10 Platform</td>
+<td>Config, logging, audit trail, eval, security</td>
+<td>structlog, pytest, .env / secrets</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Key design principle:</strong> The LLM never touches raw data directly and never writes free-form SQL against production tables. It only calls <strong>typed tools</strong> that return <strong>compact, structured evidence</strong>. That is what makes it safe, cheap, and enterprise-credible.</p>
+<hr>
+<h2>2. Layer-by-Layer Detail</h2>
+<h3>L1: Alert Ingestion</h3>
+<p>Normalize every alert into one <strong>Anomaly</strong> object so the system is monitoring-tool agnostic (Datadog, Grafana, custom job, all the same).</p>
+<pre><code class="language-json">{
+  &#34;alert_id&#34;: &#34;ALR-2026-0142&#34;,
+  &#34;metric&#34;: &#34;daily_revenue&#34;,
+  &#34;grain&#34;: &#34;day&#34;,
+  &#34;detected_at&#34;: &#34;2026-09-27T06:00:00Z&#34;,
+  &#34;anomaly_window&#34;: {&#34;start&#34;: &#34;2026-09-26&#34;, &#34;end&#34;: &#34;2026-09-26&#34;},
+  &#34;baseline_window&#34;: {&#34;start&#34;: &#34;2026-08-29&#34;, &#34;end&#34;: &#34;2026-09-25&#34;},
+  &#34;observed&#34;: 84200, &#34;expected&#34;: 121000, &#34;deviation_pct&#34;: -30.4,
+  &#34;direction&#34;: &#34;drop&#34;, &#34;severity&#34;: &#34;high&#34;, &#34;source&#34;: &#34;grafana&#34;
+}
+</code></pre>
+<p>Also build a <strong>Scenario Simulator</strong> (inject a known anomaly into synthetic data). It powers the demo and the evaluation harness.</p>
+<h3>L2: Investigation Orchestrator</h3>
+<p>An explicit state machine (not a single giant prompt) so every run is bounded and traceable:</p>
+<pre><code>RECEIVED -&gt; SCOPING -&gt; RECALL_PRIOR -&gt; EVIDENCE_GATHERING -&gt; HYPOTHESIZING
+-&gt; VALIDATING -&gt; (loop back to EVIDENCE_GATHERING if confidence &lt; threshold)
+-&gt; REPORTING -&gt; AWAITING_FEEDBACK -&gt; CLOSED (retained to memory)
+</code></pre>
+<p>Controls: max tool calls (e.g. 15), max validation loops (e.g. 2), per-tool timeout, token budget, and a stop condition (&quot;top hypothesis confidence at least 0.75 OR budget exhausted, then report with honest uncertainty&quot;).</p>
+<p>Every state transition is written to an <strong>investigation trace</strong> (JSONL). This trace drives the live UI and the audit log.</p>
+<h3>L3: Agent Core (LLM + Function Calling)</h3>
+<p>Use <strong>separate logical roles</strong>, but merge them into <strong>3 LLM calls per investigation</strong> (Plan+Hypothesize, Validate, Report) so the Groq free tier is not exhausted mid-demo. Recommended models: <code>openai/gpt-oss-120b</code> primary, <code>qwen/qwen3-32b</code> fallback. The roles:</p>
+<ol>
+<li><strong>Planner:</strong> given the anomaly plus recalled memories, outputs an investigation plan (which tools, which order).</li>
+<li><strong>Investigator:</strong> executes tool calls via function calling, summarizes each result into an evidence item.</li>
+<li><strong>Hypothesizer:</strong> proposes ranked candidate causes, each with predicted evidence (&quot;if X is the cause, we should also see Y&quot;).</li>
+<li><strong>Critic/Validator:</strong> checks each hypothesis against gathered evidence, requests targeted tests, flags contradictions.</li>
+<li><strong>Reporter:</strong> writes the final structured report.</li>
+</ol>
+<p>The &quot;predicted evidence&quot; step is the differentiator: it turns validation into a real test (falsifiable), not narrative.</p>
+<h4>ToolCallGuard (function-calling error handling, required by the brief)</h4>
+<p>Every tool call passes through one guard layer:</p>
+<table>
+<thead>
+<tr>
+<th>Failure</th>
+<th>Handling</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Malformed JSON arguments</td>
+<td>Attempt one automatic repair, else re-prompt the model with the tool schema</td>
+</tr>
+<tr>
+<td>Unknown tool / invalid parameters</td>
+<td>Return a structured error to the LLM so it self-corrects (max 2 tries)</td>
+</tr>
+<tr>
+<td>Model returns no tool call or garbage</td>
+<td>Retry, then switch to the fallback model</td>
+</tr>
+<tr>
+<td>Groq rate limit / timeout</td>
+<td>Exponential backoff; cache tool results keyed by (tool, args hash)</td>
+</tr>
+<tr>
+<td>Repeated identical calls (loops)</td>
+<td>Stop after 3 repeats and force the next stage</td>
+</tr>
+<tr>
+<td>Budget exhausted</td>
+<td>Report with honest uncertainty instead of failing</td>
+</tr>
+</tbody>
+</table>
+<p>Log every guard event to the trace and unit-test each row. Judges can see robustness.</p>
+<h3>L4: Generic Investigation Tools</h3>
+<p>Tools are <strong>generic and metric-agnostic</strong>, driven by a <strong>semantic catalog</strong> (L5), so the same agent works on revenue, churn, latency, or conversion.</p>
+<table>
+<thead>
+<tr>
+<th>Tool</th>
+<th>Input</th>
+<th>Output (structured)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>analyze_metric</code></td>
+<td>metric, windows</td>
+<td>trend, baseline vs. anomaly, seasonality-adjusted deviation, z-score, changepoint date</td>
+</tr>
+<tr>
+<td><code>breakdown_by_dimension</code></td>
+<td>metric, dimension(s), windows</td>
+<td>contribution to change per segment (top N), concentration score, mix-shift vs. rate-shift</td>
+</tr>
+<tr>
+<td><code>find_related_metrics</code></td>
+<td>metric</td>
+<td>correlated/causally-linked metrics from the catalog with their deviations (e.g., traffic, conversion, AOV)</td>
+</tr>
+<tr>
+<td><code>query_business_events</code></td>
+<td>time range, filters</td>
+<td>deployments, pricing changes, campaigns, outages, holidays, promotions near the changepoint</td>
+</tr>
+<tr>
+<td><code>analyze_logs</code> <em>(optional)</em></td>
+<td>service, time range</td>
+<td>error-rate spikes, top error signatures</td>
+</tr>
+<tr>
+<td><code>compare_cohorts</code></td>
+<td>two segments</td>
+<td>statistical difference test</td>
+</tr>
+<tr>
+<td><code>recall_similar_investigations</code></td>
+<td>evidence summary</td>
+<td>Hindsight results (see L6)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>The important technical detail: driver decomposition.</strong> For a sum metric, compute each segment's contribution to the total change, and split it into <strong>volume effect vs. rate effect</strong>. This gives mathematically defensible attribution (&quot;62% of the drop comes from Android users in India, and it is a conversion-rate effect, not a traffic effect&quot;). Judges will remember this.</p>
+<p>Each tool returns: <code>{finding, numbers, confidence_hint, chart_spec, evidence_id}</code>. The <code>chart_spec</code> lets Streamlit render Plotly charts automatically for each evidence item.</p>
+<p>Guardrails: read-only DB connection, parameterized queries only, allow-listed tables/columns from the catalog, row and time limits.</p>
+<h3>L5: Data Layer</h3>
+<p>Use DuckDB for analytics (fast, embedded, reads Parquet/CSV). Suggested schema:</p>
+<pre><code>fact_kpi(date, metric, value, &lt;dimension columns...&gt;)
+dim_catalog(metric, description, unit, aggregation, dimensions[], related_metrics[])
+business_events(event_id, ts, type, service, description, owner, metadata)
+logs_summary(ts, service, level, signature, count)          -- optional
+investigations(id, alert_id, status, started, finished, report_json, feedback_json)
+</code></pre>
+<p><strong>Semantic catalog</strong> (<code>dim_catalog</code>) is the enterprise-ready move: it tells the agent what each metric means, how it aggregates, and which dimensions and related metrics exist. Onboarding a new KPI = adding a catalog row, no code change.</p>
+<p>Seed <strong>3 to 4 realistic scenarios</strong> with planted root causes:</p>
+<ol>
+<li>Regional payment gateway failure (dimension: country + payment method)</li>
+<li>Bad app release (dimension: app version + platform)</li>
+<li>Pricing/promo change (mix shift in AOV)</li>
+<li>Tracking bug (a data-quality false alarm, so the agent must say &quot;the KPI is wrong, not the business&quot;)</li>
+</ol>
+<p>Scenario 4 is a strong differentiator: real agents must detect data quality issues.</p>
+<p><strong>Realistic data strategy (the brief calls this the #1 thing that makes a project look real):</strong></p>
+<ul>
+<li>Base facts: a real Kaggle dataset, e.g. Olist Brazilian e-commerce (orders, payments, customers, regions), aggregated into <code>fact_kpi</code>.</li>
+<li>Have the LLM generate <code>business_events</code>: deploy names (<code>checkout-service v4.12.0</code>), campaign names, vendor outages, pricing changes, with owners and timestamps.</li>
+<li>Generate realistic log signatures (<code>PaymentGatewayTimeout: upi-sdk 4.12.0 (504)</code>).</li>
+<li>Plant root causes at known dates so accuracy can be scored automatically.</li>
+<li>Write past investigations with real-sounding postmortem notes for the Hindsight backfill.</li>
+</ul>
+<h3>L6: Memory Layer (Hindsight)</h3>
+<p>This is your core innovation, so design it deliberately. Use a dedicated <strong>memory bank per tenant/team</strong> (e.g., <code>anomaly-investigator::&lt;org&gt;</code>).</p>
+<p><strong>What to retain (after human feedback), one memory per closed investigation:</strong></p>
+<pre><code>Metric: daily_revenue (drop 30%) | Segment: IN / Android / UPI
+Evidence: conversion -41% in IN-Android-UPI, traffic flat, deploy v4.12 at 05:40 UTC,
+          payment error rate 0.4% -&gt; 27%
+Root cause (confirmed): UPI SDK timeout regression in app v4.12
+Action taken: rollback to v4.11
+Outcome: revenue recovered in 3h
+Agent&#39;s initial top hypothesis: &lt;x&gt; | Correct? yes/no | Time to resolve: 3h
+</code></pre>
+<p>Use <code>context</code> and <code>tags</code> (metric, dimension, cause_type, outcome) so recall can filter.</p>
+<p><strong>When to recall (twice per investigation):</strong></p>
+<ol>
+<li><em>After scoping:</em> query from the anomaly signature (&quot;revenue drop, single-country, mobile-only, post-deploy&quot;).</li>
+<li><em>After evidence gathering:</em> query from actual findings to fetch causes that matched similar evidence patterns.</li>
+</ol>
+<p><strong>How recalled memory is used:</strong> as <strong>hypothesis priors</strong>, never as truth. The Hypothesizer receives them labeled as &quot;past cases&quot;, and the Validator must still confirm with current data. Report explicitly shows: <em>&quot;Similar to INV-0098 (rollback fixed it). Confirmed here by X, Y.&quot;</em> This prevents anchoring and is a strong trust story.</p>
+<p><strong>Reflection:</strong> periodically (or on demand) use Hindsight's reflect capability to produce org-level insights (&quot;60% of mobile-only revenue drops in the last quarter were release regressions&quot;). Show that in a &quot;What the org has learned&quot; dashboard panel.</p>
+<blockquote>
+<p>Verify exact <code>hindsight-client</code> method names and parameters against the current Hindsight docs before coding. Wrap them in your own <code>MemoryService</code> class (<code>recall()</code>, <code>retain()</code>, <code>reflect()</code>) so the rest of the app never depends on SDK details.</p>
+</blockquote>
+<p><strong>Making memory the star (25% of judging):</strong></p>
+<ol>
+<li><strong>Backfill history.</strong> Before the demo, retain 15 to 20 past investigations with older timestamps (weeks back), so the agent visibly recalls context from the past.</li>
+<li><strong>Two-stage retain.</strong> Retain an <em>unconfirmed</em> record right after the agent finishes, then retain the <em>confirmed</em> outcome after human feedback. Memory grows on every run, and outcomes refine it.</li>
+<li><strong>Show recalled memories on screen</strong> for every run (a &quot;Memory used&quot; card: which past cases, why similar, whether they helped).</li>
+<li><strong>Learning curve.</strong> Run 10 to 20 incidents in sequence and plot steps-to-root-cause, time-to-report and hypothesis accuracy against incident number, with a no-memory baseline line. Interaction 1 is generic, interaction 5 is faster, interaction 20 feels like it knows the organization. This chart is your headline.</li>
+<li><strong>Document it</strong> in <code>docs/hindsight_usage.md</code>: what is retained, when recall happens, what reflect produces, plus before/after evidence.</li>
+</ol>
+<h3>L7: Validation and Confidence Engine</h3>
+<p>Do not let the LLM just state a confidence number. Compute it:</p>
+<pre><code>confidence = w1*evidence_support + w2*temporal_alignment + w3*magnitude_explained
+           + w4*memory_prior - w5*contradictions
+</code></pre>
+<ul>
+<li><strong>Evidence support:</strong> fraction of the hypothesis's predicted evidence actually observed.</li>
+<li><strong>Temporal alignment:</strong> did the candidate cause precede the changepoint?</li>
+<li><strong>Magnitude explained:</strong> share of the deviation attributable to the affected segment.</li>
+<li><strong>Memory prior:</strong> small boost if a similar past case was confirmed.</li>
+<li><strong>Contradictions:</strong> evidence that argues against it (e.g., traffic also dropped elsewhere).</li>
+</ul>
+<p>Also include: <strong>data-quality checks</strong> (null spikes, duplicate loads, late-arriving data), <strong>counterfactual check</strong> (metric with the suspected segment removed: is the anomaly gone?), and a <strong>&quot;cannot determine&quot;</strong> outcome when evidence is weak. Honest uncertainty is an enterprise trust signal.</p>
+<h3>L8: Report Generator</h3>
+<p>Enforce a Pydantic schema so output is machine-readable and renderable:</p>
+<pre><code>InvestigationReport {
+  summary, impact (abs, %, estimated revenue at risk),
+  root_causes: [{hypothesis, confidence, evidence_ids[], contribution_pct}],
+  ruled_out: [{hypothesis, why}],
+  similar_past_cases: [{id, similarity, outcome}],
+  recommended_actions: [{action, owner_hint, priority, expected_effect}],
+  open_questions, data_quality_notes,
+  trace_id, tools_used, duration, tokens_used
+}
+</code></pre>
+<p>Every claim must cite <code>evidence_ids</code>. Reject reports with uncited claims (auto-retry once).</p>
+<h3>L9: Experience Layer (Streamlit + Plotly)</h3>
+<p>Pages:</p>
+<ol>
+<li><strong>Alert Inbox:</strong> list of anomalies with severity, one-click &quot;Investigate&quot;.</li>
+<li><strong>Live Investigation:</strong> streaming timeline of agent steps (planning, tool call, evidence found, memory recalled, hypothesis added/killed) with Plotly charts appearing as evidence arrives. This is your demo centerpiece.</li>
+<li><strong>Report View:</strong> summary, waterfall chart of contribution by segment, ranked causes with confidence bars, evidence drill-down, ruled-out list.</li>
+<li><strong>Feedback Panel:</strong> &quot;Confirm cause / Wrong cause / Partially&quot;, action taken, outcome. This triggers Hindsight retain.</li>
+<li><strong>Memory Explorer:</strong> past investigations, recall hits shown per run, org insights.</li>
+<li><strong>Impact Dashboard:</strong> MTTR before vs. after memory, hypothesis accuracy over time, tool calls per investigation.</li>
+</ol>
+<h3>L10: Platform and Enterprise Concerns</h3>
+<table>
+<thead>
+<tr>
+<th>Concern</th>
+<th>Approach</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Security</td>
+<td>Read-only DB role, secrets in env/secret manager, PII column masking rule in the catalog, no raw rows sent to the LLM (aggregates only)</td>
+</tr>
+<tr>
+<td>Auditability</td>
+<td>Immutable trace per investigation: every prompt, tool call, result hash, model version</td>
+</tr>
+<tr>
+<td>Multi-tenancy</td>
+<td><code>tenant_id</code> on investigations, one Hindsight bank per tenant</td>
+</tr>
+<tr>
+<td>Reliability</td>
+<td>Retries with backoff, tool timeouts, LLM fallback model, deterministic tool results cached by hash</td>
+</tr>
+<tr>
+<td>Cost control</td>
+<td>Token and tool-call budgets, compact evidence summaries, smaller model for routine steps</td>
+</tr>
+<tr>
+<td>Human-in-the-loop</td>
+<td>Agent recommends; humans act. No autonomous remediation (state this explicitly)</td>
+</tr>
+<tr>
+<td>Extensibility</td>
+<td>Tool registry (decorator-based), adapters for Snowflake/BigQuery/Postgres via a <code>DataSource</code> interface</td>
+</tr>
+<tr>
+<td>Evaluation</td>
+<td>Benchmark of planted scenarios: root-cause accuracy, steps-to-cause, false-alarm handling</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2>3. End-to-End Runtime Flow</h2>
+<ol>
+<li><strong>Alert arrives</strong> (webhook/simulator), normalized into <code>Anomaly</code>, investigation record created.</li>
+<li><strong>Scoping:</strong> <code>analyze_metric</code> confirms the anomaly is real, finds the changepoint, checks data quality.</li>
+<li><strong>Recall #1:</strong> Hindsight queried with the anomaly signature; top cases attached as priors.</li>
+<li><strong>Planner</strong> produces a plan informed by the priors.</li>
+<li><strong>Evidence gathering:</strong> <code>breakdown_by_dimension</code>, <code>find_related_metrics</code>, <code>query_business_events</code> (and logs). Each returns an evidence item with a chart.</li>
+<li><strong>Recall #2:</strong> Hindsight queried with actual findings for evidence-matched cases.</li>
+<li><strong>Hypothesizer</strong> generates 3 to 5 ranked hypotheses with <em>predicted</em> evidence.</li>
+<li><strong>Validation loop:</strong> Critic requests targeted tools (cohort comparison, counterfactual, log check). Confidence computed by L7. Kill weak hypotheses, loop if below threshold (bounded).</li>
+<li><strong>Report</strong> generated, validated against schema and citation rule.</li>
+<li><strong>Human decides and acts</strong>, then submits feedback and outcome.</li>
+<li><strong>Retain:</strong> the closed investigation (evidence, cause, action, outcome, was-agent-right) is written to Hindsight.</li>
+<li><strong>Metrics updated:</strong> MTTR, accuracy, steps saved, feeding the impact dashboard.</li>
+</ol>
+<hr>
+<h2>4. Suggested Project Structure</h2>
+<pre><code>anomaly-investigator/
+├── app/                      # Streamlit UI (pages/)
+├── api/                      # FastAPI webhook + REST
+├── core/
+│   ├── orchestrator.py       # state machine, budgets
+│   ├── agents/               # planner, investigator, hypothesizer, critic, reporter
+│   ├── prompts/
+│   └── schemas.py            # Pydantic: Anomaly, Evidence, Hypothesis, Report
+├── tools/                    # registry + metric, dimension, related, events, logs
+├── data/                     # DuckDB, seed + scenario generators, catalog
+├── memory/memory_service.py  # Hindsight wrapper
+├── validation/               # confidence, data-quality, counterfactual
+├── eval/                     # scenario benchmark runner
+├── tests/
+└── docs/architecture.md
+</code></pre>
+<hr>
+<h2>5. Build Plan (Prioritized for a Hackathon)</h2>
+<p><strong>Scope rule:</strong> a polished agent that does one thing brilliantly beats a sprawling prototype.</p>
+<table>
+<thead>
+<tr>
+<th>Build (for the demo)</th>
+<th>Document only (production roadmap in README)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>DuckDB data + catalog, 3 to 4 scenarios</td>
+<td>Multi-tenancy, per-tenant banks</td>
+</tr>
+<tr>
+<td>4 tools: metric, dimension, events, related metrics</td>
+<td>Log/observability tool, Snowflake/BigQuery adapters</td>
+</tr>
+<tr>
+<td>Agent loop, <code>ToolCallGuard</code>, structured report</td>
+<td>FastAPI webhook ingestion (use a simulator + Streamlit button)</td>
+</tr>
+<tr>
+<td>Hindsight retain/recall + backfill</td>
+<td>Role-based access, PII masking pipeline</td>
+</tr>
+<tr>
+<td>Live timeline, feedback panel, learning-curve dashboard</td>
+<td>Slack / Grafana / Datadog integrations</td>
+</tr>
+</tbody>
+</table>
+<table>
+<thead>
+<tr>
+<th>Priority</th>
+<th>Deliverable</th>
+<th>Why it matters</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>P0</td>
+<td>Data + catalog + 2 scenarios; <code>analyze_metric</code>, <code>breakdown_by_dimension</code>, <code>query_business_events</code></td>
+<td>Core evidence engine</td>
+</tr>
+<tr>
+<td>P0</td>
+<td>Agent loop with function calling and structured report</td>
+<td>Working end-to-end</td>
+</tr>
+<tr>
+<td>P0</td>
+<td>Hindsight retain + recall wired through <code>MemoryService</code></td>
+<td>Your core theme</td>
+</tr>
+<tr>
+<td>P1</td>
+<td>Live investigation timeline + Plotly charts</td>
+<td>Demo impact</td>
+</tr>
+<tr>
+<td>P1</td>
+<td>Feedback panel and the &quot;before vs. after memory&quot; comparison</td>
+<td>Proof of learning</td>
+</tr>
+<tr>
+<td>P1</td>
+<td>Confidence engine + ruled-out hypotheses</td>
+<td>Credibility</td>
+</tr>
+<tr>
+<td>P2</td>
+<td>Data-quality false-alarm scenario, counterfactual check</td>
+<td>Differentiator</td>
+</tr>
+<tr>
+<td>P2</td>
+<td>Eval harness and impact dashboard</td>
+<td>Enterprise polish</td>
+</tr>
+<tr>
+<td>P3</td>
+<td>Log analysis, multi-tenant, webhook</td>
+<td>Extensibility story</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2>6. Demo Script (3 to 4 minutes)</h2>
+<ol>
+<li><strong>Problem (20s):</strong> &quot;Alerts tell you <em>that</em> revenue dropped. Finding <em>why</em> takes hours.&quot;</li>
+<li><strong>Case 1, cold start (60s):</strong> Trigger the alert. Show the live timeline, the driver waterfall, ruled-out hypotheses, and the final report. Mark the confirmed cause and the rollback action. Memory is retained.</li>
+<li><strong>Case 2, similar incident (60s):</strong> Trigger a related anomaly. Show the memory recall card (&quot;similar to INV-001&quot;), fewer tool calls, faster time-to-cause.</li>
+<li><strong>Case 3, false alarm (30s):</strong> Agent identifies a tracking bug and says the business is fine.</li>
+<li><strong>Learning curve (40s):</strong> Show the chart across 10 to 20 incidents (with and without memory), MTTR reduction and the reflect-generated org insights.</li>
+<li><strong>Close (20s):</strong> Read-only, auditable, human-in-the-loop, plugs into any monitoring stack.</li>
+</ol>
+<hr>
+<h2>7. Pitfalls to Avoid</h2>
+<ul>
+<li>Letting the LLM write arbitrary SQL. Use typed tools.</li>
+<li>Sending raw rows to the LLM. Send aggregates and compact evidence.</li>
+<li>Treating memory as truth. Use it as priors that must be validated.</li>
+<li>Presenting one confident answer. Show ranked hypotheses plus what was ruled out.</li>
+<li>Skipping measurement. If you cannot show &quot;faster with memory&quot;, the Hindsight story is just a claim.</li>
+<li>Ignoring function-calling failures. The brief explicitly warns about them.</li>
+<li>Building the whole roadmap. Ship the demo path first.</li>
+</ul>
+<hr>
+<h2>8. Path to Adoption (Real-World Impact)</h2>
+<ul>
+<li><strong>Buyers/users:</strong> data and BI teams, SRE/operations, revenue operations, e-commerce and fintech companies with many KPIs.</li>
+<li><strong>Pain:</strong> each anomaly costs hours of dashboard and SQL digging, and similar cases are re-investigated from scratch.</li>
+<li><strong>Integration:</strong> alerts from Grafana, Datadog or a scheduled monitor; reports posted to Slack; read-only access to the warehouse.</li>
+<li><strong>Value proof:</strong> report your measured numbers, e.g. &quot;median steps to root cause fell from X to Y over 20 incidents.&quot;</li>
+<li><strong>Pricing story:</strong> per-seat or per-monitored-KPI subscription; clears the brief's &quot;would someone pay $50/month&quot; test.</li>
+</ul>
+<h2>9. Submission Checklist</h2>
+<ul>
+<li><input disabled="" type="checkbox"> GitHub repo: clean structure, README with architecture diagram and roadmap</li>
+<li><input disabled="" type="checkbox"> <code>docs/hindsight_usage.md</code>: explanation of Hindsight memory usage with before/after evidence</li>
+<li><input disabled="" type="checkbox"> Demo video (3 to 4 minutes, script in section 6)</li>
+<li><input disabled="" type="checkbox"> Live demo ready, with pre-seeded memory and a fallback recorded run</li>
+<li><input disabled="" type="checkbox"> Per team member: article, social media post and video per the official content guide (confirm the exact format in the guide)</li>
+<li><input disabled="" type="checkbox"> Tests for <code>ToolCallGuard</code> and scenario evaluation results</li>
+</ul>
+
+
+<!--claude-mermaid-runtime-begin:3477-->
+<style>.mermaid-diagram{margin-block:4px}.mermaid-diagram svg{display:block;margin:0 auto;max-width:100%;height:auto}</style>
+<script src="/_runtime/mermaid-11.16.1.min.js"></script>
+<script>(function(){
+var CFG={"palettes":{"light":{"surface":"#f4efe4","text":"#42392e","line":"#8a7f6d","border":"#7a6c52","bg":"#fffdf8"},"dark":{"surface":"#262b34","text":"#f2f3f5","line":"#a8adb8","border":"#9aa4b8","bg":"#1f232b"}}};
+if(typeof mermaid==='undefined')return;
+var pres=Array.prototype.slice.call(document.querySelectorAll('pre.mermaid')).filter(function(p){if(p.hasAttribute('data-claude-mermaid-claimed'))return false;p.setAttribute('data-claude-mermaid-claimed','1');return true;});
+if(!pres.length)return;
+var mq=window.matchMedia?window.matchMedia('(prefers-color-scheme: dark)'):null;
+var root=document.documentElement;
+var items=pres.map(function(pre){
+var mount=document.createElement('div');mount.className='mermaid-diagram';
+return {pre:pre,mount:mount,src:pre.textContent||''};
+});
+var seq=0;
+var renderGen=0;
+var lastKey='';
+function pageBg(fallback){
+var els=[document.body,document.documentElement];
+for(var i=0;i<els.length;i++){
+var c=els[i]&&getComputedStyle(els[i]).backgroundColor;
+if(c&&c!=='transparent'&&c!=='rgba(0, 0, 0, 0)')return c;
+}
+return fallback;
+}
+function render(){
+var theme=root.getAttribute('data-theme');
+var dark=theme==='dark'||(!!(mq&&mq.matches)&&theme!=='light');
+var pal=dark?CFG.palettes.dark:CFG.palettes.light;
+var bg=pageBg(pal.bg);
+var key=(dark?'d':'l')+'|'+bg;
+if(key===lastKey)return;
+lastKey=key;
+var gen=++renderGen;
+var font=getComputedStyle(document.body).fontFamily||'sans-serif';
+var nat={useMaxWidth:false};
+mermaid.initialize({
+startOnLoad:false,securityLevel:'strict',theme:'base',
+flowchart:nat,sequence:nat,er:nat,state:nat,class:nat,pie:nat,
+gantt:nat,journey:nat,timeline:nat,gitGraph:nat,mindmap:nat,xyChart:nat,
+quadrantChart:nat,sankey:nat,c4:nat,requirement:nat,block:nat,
+packet:nat,kanban:nat,architecture:nat,radar:nat,
+themeVariables:{background:bg,mainBkg:pal.surface,primaryColor:pal.surface,
+primaryTextColor:pal.text,lineColor:pal.line,primaryBorderColor:pal.border,
+nodeBorder:pal.border,clusterBorder:pal.border,edgeLabelBackground:bg,
+clusterBkg:'rgba(127,127,127,0.07)',titleColor:pal.text,
+darkMode:dark,rowOdd:bg,rowEven:'rgba(127,127,127,0.07)',
+attributeBackgroundColorOdd:bg,attributeBackgroundColorEven:'rgba(127,127,127,0.07)',
+fontSize:'16px',fontFamily:font},
+themeCSS:'.node rect, .node circle, .node polygon, .node path, .cluster rect { stroke-width: 2px; }'
+});
+items.forEach(function(it){
+var id='claude-mermaid-'+seq++;
+mermaid.render(id,it.src).then(function(r){
+if(gen!==renderGen)return;
+var prev=it.pre.previousElementSibling;
+if(prev&&prev.className==='mermaid-diagram'&&prev!==it.mount)return;
+it.mount.innerHTML=r.svg;
+if(!it.mount.parentNode)it.pre.parentNode.insertBefore(it.mount,it.pre);
+it.pre.style.display='none';
+},function(){
+var scratch=document.getElementById(id);
+if(scratch)scratch.parentNode.removeChild(scratch);
+scratch=document.getElementById('d'+id);
+if(scratch)scratch.parentNode.removeChild(scratch);
+if(gen!==renderGen)return;
+if(it.mount.parentNode)it.mount.parentNode.removeChild(it.mount);
+it.pre.style.display='';
+});
+});
+}
+render();
+if(mq&&mq.addEventListener)mq.addEventListener('change',render);
+if(typeof MutationObserver!=='undefined')new MutationObserver(render).observe(root,{attributes:true,attributeFilter:['data-theme']});
+})();</script>
+<!--claude-mermaid-runtime-end-->
+</body></html>
