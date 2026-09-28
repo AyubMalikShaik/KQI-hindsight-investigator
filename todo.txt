@@ -1,0 +1,11 @@
+# KQI Hindsight Investigator - Next Implementation Steps
+
+## Completed Steps
+- [x] Analyzed codebase architecture, environment dependencies, and test suite execution.
+- [x] Verified database generation (`data.build`) and tool execution pipeline (`tests.test_tools`).
+- [x] Confirmed unit tests pass for non-LLM/non-remote components (`tests/test_tools.py`, `tests/test_memory_priors.py`).
+- [x] Created comprehensive `README.md` with system architecture, setup, quickstart usage, and testing guide.
+
+## Notes on Remote Integration Tests
+- Full end-to-end runs (`run_investigation.py`, `scripts.seed_bank`, `eval.harness`) require active external credentials (`GROQ_API_KEY` and `HINDSIGHT_API_KEY` in `.env`).
+- Local offline verification is fully functional and all offline tests pass cleanly.
