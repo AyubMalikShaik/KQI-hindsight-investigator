@@ -2,19 +2,12 @@
 
     streamlit run app/app.py
 
-Three things the architecture insists the screen show on every run, which is
-why this exists rather than a nicer terminal:
-
-  * the cases memory actually recalled, with their scores and whether they
-    survived into a hypothesis that was cited,
-  * the same confidence figure with and without the prior, so "memory helped"
-    is something you can check rather than take on trust,
-  * the feedback panel that closes stage 2 of the retain cycle -- an analyst
-    confirming or rejecting the conclusion is what turns an agent guess into
-    the kind of case the next investigation may rely on.
-
-The learning-curve chart reads artifacts/learning_curve.json rather than
-recomputing, because recomputing costs a Hindsight bank per point.
+Features:
+  * Alert Inbox / Scenario picker with one-click "Run Live Investigation"
+  * Real-time trace event timeline during live runs
+  * Evidence ChartSpec rendering (Plotly bar, line, waterfall charts)
+  * Memory recall analysis and confidence score delta (with vs without memory prior)
+  * Retain Stage 2 Feedback submission and reflect synthesis
 """
 
 from __future__ import annotations
@@ -23,6 +16,7 @@ import glob
 import json
 import os
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
 if hasattr(sys.stdout, "reconfigure"):
@@ -32,14 +26,22 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+import plotly.express as px  # noqa: E402
+import plotly.graph_objects as go  # noqa: E402
 import streamlit as st  # noqa: E402
 
-from core.schemas import InvestigationReport  # noqa: E402
+from core.config import get_settings  # noqa: E402
+from core.schemas import Anomaly, Direction, InvestigationReport, Severity, Window  # noqa: E402
+from data.alerts import build_alert  # noqa: E402
+from data.scenarios import SCENARIOS  # noqa: E402
 
 REPORT_DIR = PROJECT_ROOT / "artifacts" / "reports"
 TRACE_DIR = PROJECT_ROOT / "artifacts" / "traces"
 CURVE_PATH = PROJECT_ROOT / "artifacts" / "learning_curve.json"
 MEMORY_WEIGHT = 0.15
+
+REPORT_DIR.mkdir(parents=True, exist_ok=True)
+TRACE_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def report_paths() -> list[Path]:
@@ -67,12 +69,6 @@ def load_trace(trace_id: str) -> list[dict]:
 
 
 def score_events(events: list[dict]) -> dict[str, dict]:
-    """Parse `score` trace events into per-hypothesis contributions.
-
-    The report keeps only the final number, so the trace is the only place the
-    four signals are separable -- which is what lets the UI show what confidence
-    would have been without the memory prior.
-    """
     out: dict[str, dict] = {}
     for event in events:
         if event.get("kind") != "score":
@@ -93,14 +89,60 @@ def score_events(events: list[dict]) -> dict[str, dict]:
 
 
 def without_memory(total: float, values: dict) -> float:
-    """Confidence the same hypothesis would have scored with no prior.
-
-    The prior enters the weighted sum, not as a multiplier, so removing it is a
-    subtraction of its contribution. Anything this turns negative is a bug in
-    the parse rather than a real score, so it is clamped rather than shown.
-    """
     prior = values.get("prior", 0.0)
     return round(max(0.0, total - MEMORY_WEIGHT * prior), 3)
+
+
+def render_chart_spec(chart_dict: dict) -> None:
+    """Render a ChartSpec dictionary using Plotly."""
+    if not chart_dict or "type" not in chart_dict:
+        return
+
+    chart_type = chart_dict.get("type")
+    title = chart_dict.get("title", "")
+    series = chart_dict.get("series", [])
+    categories = chart_dict.get("categories", [])
+
+    if chart_type in ("bar", "column") and series and categories:
+        fig = go.Figure()
+        for s in series:
+            fig.add_trace(
+                go.Bar(
+                    x=categories,
+                    y=s.get("values", []),
+                    name=s.get("name", "series"),
+                )
+            )
+        fig.update_layout(title=title, barmode="group", height=320)
+        st.plotly_chart(fig, use_container_width=True)
+
+    elif chart_type == "line" and series and categories:
+        fig = go.Figure()
+        for s in series:
+            fig.add_trace(
+                go.Scatter(
+                    x=categories,
+                    y=s.get("values", []),
+                    mode="lines+markers",
+                    name=s.get("name", "series"),
+                )
+            )
+        fig.update_layout(title=title, height=320)
+        st.plotly_chart(fig, use_container_width=True)
+
+    elif chart_type == "waterfall" and series and categories:
+        values = series[0].get("values", []) if series else []
+        fig = go.Figure(
+            go.Waterfall(
+                name="Decomposition",
+                orientation="v",
+                measure=["relative"] * len(values),
+                x=categories,
+                y=values,
+            )
+        )
+        fig.update_layout(title=title, height=340)
+        st.plotly_chart(fig, use_container_width=True)
 
 
 # --------------------------------------------------------------------------- #
@@ -135,8 +177,11 @@ def render_report(report: InvestigationReport, events: list[dict]) -> None:
             if values:
                 st.caption(
                     "signals: "
-                    + ", ".join(f"{k}={v:g}" for k, v in sorted(values.items())
-                                if k in {"support", "magnitude", "temporal", "prior"})
+                    + ", ".join(
+                        f"{k}={v:g}"
+                        for k, v in sorted(values.items())
+                        if k in {"support", "magnitude", "temporal", "prior"}
+                    )
                 )
             st.caption("evidence: " + ", ".join(cause.evidence_ids) or "none")
 
@@ -144,6 +189,16 @@ def render_report(report: InvestigationReport, events: list[dict]) -> None:
         st.subheader("Ruled out")
         for entry in report.ruled_out:
             st.markdown(f"- **{entry.hypothesis}** — {entry.why}")
+
+    # Evidence charts visualization
+    evidence_events = [e for e in events if e.get("kind") == "evidence"]
+    if evidence_events:
+        st.subheader("Evidence Visualizations")
+        for ev in evidence_events:
+            data = ev.get("data") or {}
+            chart = data.get("chart")
+            if chart:
+                render_chart_spec(chart)
 
 
 def render_memory(report: InvestigationReport, events: list[dict]) -> None:
@@ -203,14 +258,14 @@ def render_memory(report: InvestigationReport, events: list[dict]) -> None:
         kind = event.get("kind", "")
         message = str(event.get("message", ""))
         icon = {
-            "evidence": "evidence",
-            "hypothesis": "hypothesis",
-            "memory_recall": "memory",
-            "memory_attached": "memory",
-            "score": "score",
-            "state": "state",
-            "done": "done",
-        }.get(kind, kind)
+            "evidence": "📊",
+            "hypothesis": "💡",
+            "memory_recall": "🧠",
+            "memory_attached": "🧠",
+            "score": "🎯",
+            "state": "🔄",
+            "done": "✅",
+        }.get(kind, "•")
         st.markdown(f"`{icon}` {message}")
 
 
@@ -275,14 +330,6 @@ def render_learning_curve() -> None:
                 cells.append(f"{mark} {row['confidence']:.2f} pri={row['priors']}")
         lines.append(f"| {size} | " + " | ".join(cells) + " |")
     st.markdown("\n".join(lines))
-
-    wrong = [
-        f"{row['scenario']} @ {row['size']}"
-        for row in rows
-        if row.get("correct") is False
-    ]
-    if wrong:
-        st.warning("answer was wrong at: " + ", ".join(sorted(set(wrong))))
 
 
 def render_feedback(report: InvestigationReport) -> None:
@@ -390,20 +437,80 @@ def render_feedback(report: InvestigationReport) -> None:
         memory.close()
 
 
+def run_live_investigation(scenario_id: str, enable_memory: bool) -> None:
+    st.subheader(f"⚡ Live Investigation: {scenario_id}")
+
+    import tools.investigation  # noqa: F401,E402
+    from agent.orchestrator import Investigation, TraceEvent  # noqa: E402
+    from memory.memory_service import MemoryService  # noqa: E402
+
+    settings = get_settings()
+    if not settings.groq.configured:
+        st.error("GROQ_API_KEY is missing from .env. Cannot run LLM investigation.")
+        return
+
+    # Build DB if needed
+    alert = build_alert(scenario_id, settings.db_path)
+    memory = MemoryService(settings.hindsight, settings.bank)
+    if memory.available and enable_memory:
+        memory.ensure_bank()
+
+    timeline_placeholder = st.empty()
+    live_events: list[dict] = []
+
+    def on_event(event: TraceEvent) -> None:
+        live_events.append({"kind": event.kind, "message": event.message, "data": event.data})
+        with timeline_placeholder.container():
+            st.write(f"**Step:** {event.kind} - {event.message[:200]}")
+
+    investigation = Investigation(
+        anomaly=alert,
+        settings=settings,
+        memory=memory,
+        memory_enabled=enable_memory and memory.available,
+        on_event=on_event,
+    )
+
+    with st.spinner("Investigating scenario..."):
+        try:
+            report = investigation.run()
+            investigation.write_trace()
+            report_path = investigation.persist(report)
+            if memory.available and enable_memory:
+                memory.retain_report(report, report.investigation_id)
+            st.success(f"Investigation complete! Written to {report_path.name}")
+            st.rerun()
+        except Exception as err:
+            st.error(f"Investigation failed: {err}")
+        finally:
+            memory.close()
+
+
 # --------------------------------------------------------------------------- #
 # shell
 # --------------------------------------------------------------------------- #
 def main() -> None:
     st.set_page_config(page_title="Lumen", page_icon="🔎", layout="wide")
-    st.title("Lumen — alert-triggered root cause agent")
+    st.title("Lumen — Alert-Triggered Root Cause Investigator")
 
     paths = report_paths()
-    if not paths:
-        st.warning("No reports yet. Run `python -m run_investigation` first.")
-        return
 
     with st.sidebar:
-        st.subheader("Reports")
+        st.header("🚨 Alert Inbox & Scenario Trigger")
+        selected_scenario = st.selectbox(
+            "Select Scenario Alert",
+            options=sorted(SCENARIOS.keys()),
+            format_func=lambda s: f"{s}: {SCENARIOS[s].name}",
+        )
+        scenario_meta = SCENARIOS[selected_scenario]
+        st.info(f"**Metric:** {scenario_meta.metric}\n\n**Cause:** {scenario_meta.planted_cause_type}")
+
+        use_memory = st.checkbox("Enable Hindsight Memory", value=True)
+        if st.button("🚀 Start Live Investigation", type="primary"):
+            run_live_investigation(selected_scenario, use_memory)
+
+        st.divider()
+        st.subheader("Past Investigation Reports")
         labels = []
         for path in paths:
             report = load_report(path)
@@ -417,24 +524,26 @@ def main() -> None:
                     report,
                 )
             )
-        if not labels:
-            st.warning("No readable reports.")
-            return
 
-        choice = st.selectbox(
-            "Investigation",
-            options=range(len(labels)),
-            format_func=lambda i: labels[i][0],
-        )
-        _, path, report = labels[choice]
-        st.caption(path.name)
-        memory_on = bool(report.memory_used)
-        st.caption(
-            "memory: on" if memory_on else "memory: off / unavailable for this run"
-        )
+        if labels:
+            choice = st.selectbox(
+                "Select Report",
+                options=range(len(labels)),
+                format_func=lambda i: labels[i][0],
+            )
+            _, path, report = labels[choice]
+            st.caption(path.name)
+            memory_on = bool(report.memory_used)
+            st.caption("memory: on" if memory_on else "memory: off / unavailable")
+        else:
+            report = None
+
+    if report is None:
+        st.warning("No completed reports found. Use the sidebar to start an investigation!")
+        return
 
     tabs = st.tabs(
-        ["Report", "Memory", "History", "Learning curve", "Feedback"]
+        ["Report", "Memory & Trace", "History", "Learning curve", "Feedback"]
     )
     events = load_trace(report.trace_id)
     with tabs[0]:
