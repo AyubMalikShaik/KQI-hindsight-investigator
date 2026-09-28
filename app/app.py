@@ -193,7 +193,7 @@ def render_memory_comparison_banner(report: InvestigationReport, events: list[di
                 "Hypothesis ID": rc.hypothesis_id,
                 "Cause Type": rc.cause_type,
                 "With Memory Score": f"{rc.confidence:.3f}",
-                "Without Memory Score": f"{rc.base_score:.3f}" if hasattr(rc, "base_score") else f"{rc_base:.3f}",
+                "Without Memory Score": f"{rc_base:.3f}",
                 "Prior Lift Delta": f"{rc_lift:+.3f}",
             })
 
@@ -409,7 +409,12 @@ def run_live_investigation(scenario_id: str, enable_memory: bool) -> None:
             report_path = investigation.persist(report)
             if memory.available and enable_memory:
                 memory.retain_report(report, report.investigation_id)
-            st.success(f"Investigation completed! Saved to {report_path.name}")
+
+            # Auto-select newly created report
+            new_label = f"{report.investigation_id or report.trace_id} ({report.status})"
+            st.session_state["auto_select_report"] = new_label
+
+            st.success(f"Investigation completed! Displaying report {new_label}...")
             st.rerun()
         except Exception as err:
             st.error(f"Investigation failed: {err}")
@@ -421,8 +426,8 @@ def run_live_investigation(scenario_id: str, enable_memory: bool) -> None:
 # shell
 # --------------------------------------------------------------------------- #
 def main() -> None:
-    st.set_page_config(page_title="Lumen Anomaly Investigator", page_icon="🔎", layout="wide")
-    st.title("🔎 KQI Anomaly Root Cause Investigator")
+    st.set_page_config(page_title="Lumen — Hindsight-Powered Investigator", page_icon="🔎", layout="wide")
+    st.title("🔎 Lumen — Hindsight-Powered Root Cause Investigator")
 
     paths = report_paths()
 
@@ -448,11 +453,22 @@ def main() -> None:
         for path in paths:
             rep = load_report(path)
             if rep:
-                label = f"{rep.investigation_id or path.stem} ({rep.status})"
+                label = f"{rep.investigation_id or rep.trace_id} ({rep.status})"
                 report_options.append(label)
                 report_map[label] = (path, rep)
 
-        selected_option = st.selectbox("Select Past Investigation", options=report_options)
+        # Check if an investigation was just run and needs auto-selecting
+        default_index = 0
+        auto_selected = st.session_state.get("auto_select_report")
+        if auto_selected and auto_selected in report_options:
+            default_index = report_options.index(auto_selected)
+
+        selected_option = st.selectbox(
+            "Select Past Investigation",
+            options=report_options,
+            index=default_index,
+        )
+
         if selected_option != "-- Choose an investigation --":
             path, report = report_map[selected_option]
         else:
@@ -460,9 +476,9 @@ def main() -> None:
 
     if report is None:
         st.markdown("""
-        ### Welcome to Lumen Anomaly Investigator
+        ### Welcome to Lumen — Hindsight-Powered Anomaly Investigator
 
-        Lumen investigates revenue & KQI metric anomalies by analyzing metric breakdowns, business events, deployment logs, and historical memory.
+        Lumen is a **Hindsight-powered** autonomous investigation agent that investigates revenue & KQI metric anomalies. It synthesizes historical incident memories from Hindsight with live dataset evidence (metric breakdowns, business events, deployment logs) to determine root causes.
 
         **To get started:**
         - Select an alert scenario in the sidebar and click **🚀 Start Live Investigation**, OR
