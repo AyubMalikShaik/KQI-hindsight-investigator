@@ -1,11 +1,107 @@
-# KQI Hindsight Investigator - Next Implementation Steps
+Lumen — architecture and next steps
+Alert-triggered KPI root-cause agent. Memory is a prior that current tools must still verify. Reviewed against Architecture.html and the Python packages on 28 Sep 2026.
 
-## Completed Steps
-- [x] Analyzed codebase architecture, environment dependencies, and test suite execution.
-- [x] Verified database generation (`data.build`) and tool execution pipeline (`tests.test_tools`).
-- [x] Confirmed unit tests pass for non-LLM/non-remote components (`tests/test_tools.py`, `tests/test_memory_priors.py`).
-- [x] Created comprehensive `README.md` with system architecture, setup, quickstart usage, and testing guide.
+~90%
+Hackathon P0/P1 engine
+4 / 4
+Planted scenarios scored
+8
+Seeded prior cases
+Partial
+Live demo UX
+The product is investigation-complete; the demo surface is not.
+CLI + memory + eval already show that Hindsight can change the conclusion (SCN-001) and the mechanism (SCN-002). Streamlit still reviews finished reports — it does not start a live investigation, render ChartSpec waterfalls, or act as an alert inbox.
+Runtime path
+Solid boxes are implemented. L1 webhook and live streaming UI are the main missing pieces on this path.
 
-## Notes on Remote Integration Tests
-- Full end-to-end runs (`run_investigation.py`, `scripts.seed_bank`, `eval.harness`) require active external credentials (`GROQ_API_KEY` and `HINDSIGHT_API_KEY` in `.env`).
-- Local offline verification is fully functional and all offline tests pass cleanly.
+Alert / CLI
+
+Investigation SM
+
+Groq roles
+
+Typed tools
+
+DuckDB
+
+Confidence
+
+JSON report
+
+Streamlit
+
+Feedback
+
+Hindsight bank
+
+State machine (actual code)
+RECEIVED → SCOPING → RECALL_PRIOR → PLANNING → EVIDENCE_GATHERING → RECALL_EVIDENCE → HYPOTHESIZING → VALIDATING → REPORTING → CLOSED. Feedback is a separate CLI/UI step, not a machine state.
+
+Layer status vs the architecture doc
+Layer	Intended	Shipped	Gap
+L1 Ingestion
+Webhook + simulator	Pydantic Anomaly + scenario alerts via CLI	No FastAPI webhook; Streamlit has no Investigate button
+L2 Orchestrator	Bounded SM + JSONL traces	Full Investigation class, budgets, window snap	AWAITING_FEEDBACK not a state (by design now)
+L3 Agent	3 merged LLM calls	4 JSON roles: plan, hypothesize, validate, report	More Groq traffic than the original 3-call budget
+L4 Tools	Metric, dimension, related, events	Those four plus query_config_changes; logs fold into events	No compare_cohorts; no standalone analyze_logs
+L5 Data	DuckDB + catalog + 3–4 scenarios	Synthetic funnel warehouse, 4 planted incidents	Not a Kaggle Olist base; still internally coherent
+L6 Memory	Hindsight central and visible	MemoryService, 2-stage retain, self-alert filter, 8 seeds	Org-level reflect dashboard is a file, not a panel
+L7 Validation	Weighted confidence, not LLM self-score	0.40/0.25/0.20/0.15 split, 0.85 non-memory cap	Counterfactual-as-tool not a first-class call
+L8 Report
+Cited structured report	Citation repair, impact from alert math, stage tags	None material
+L9 UX
+Live timeline, waterfall, inbox, feedback, curve	Report browser + memory cards + feedback + curve JSON	No live run, no Plotly, no inbox
+L10 Platform
+README, tests, eval, secrets	Script-style tests, A/B, learning curve, .env	No README, no requirements.txt, no pytest package
+What already works (do not rebuild)
+Evidence engine
+Tools return compact Evidence with ChartSpec. Driver decomposition (volume vs rate) lives in tools/sql.py. ToolCallGuard repairs JSON, caches, and stops repeat loops.
+
+Memory as prior, not truth
+Recall twice (signature then evidence). Priors attach per mechanism. Stage-2 feedback replaces the same document_id. Reflect is written to disk and not re-retained.
+
+Learning curve — confidence vs bank size
+Source: artifacts/learning_curve.json · deterministic fallback path · history added in date order
+
+0.45
+0.65
+0.85
+1.05
+0 cases
+4
+8
+SCN-001 release (UPI SDK)
+SCN-002 config (keepalive vs decoy)
+SCN-003 data quality
+SCN-004 traffic (negative control)
+Y axis: computed confidence (0–1). X axis: number of seeded prior cases available to recall.
+
+When memory actually changes the answer
+Scenario	Memory off	Full bank (8)	What memory did
+SCN-001 UPI SDK deploy
+payment_failure 0.850 (wrong type)	release_regression v4.12.0 0.899	Flips cause type once checkout-deploy is in the bank (size 6+)
+SCN-002 silent config
+config_change on decoy conn_pool_max	keepalive_ms 0.892	Separates two same-type config keys; recency alone picks the decoy
+SCN-003 recognition bug	data_quality 0.530	data_quality 0.576	Confidence only — already the right class without memory
+SCN-004 paid traffic	traffic_loss 0.770	traffic_loss 0.812	Negative control: same conclusion, small prior lift
+Demo implication
+Seed the full 8-case bank before showing SCN-001. At 0–4 cases the fallback path still calls it a payment failure. SCN-002 is the cleaner “memory chose the mechanism” clip.
+Hackathon build plan vs repo
+0%
+50%
+100%
+P3 extens…
+Done
+Remaining
+Rough completion share of the Architecture.html priority table (not hours). P1 remainder is almost entirely live Streamlit.
+
+Recommended next steps (priority order)
+
+1. Make Streamlit start an investigation (scenario picker + live timeline from on_event). This is the 60s demo centerpiece the architecture promised.
+2. Render Evidence.chart (ChartSpec) with Plotly — especially the dimension waterfall. Specs are already produced; the UI ignores them.
+3. Alert inbox: list SCN-001–004 with severity and one-click Investigate. Skip FastAPI until after the demo.
+4. Write README: architecture diagram, how to seed bank / run / streamlit, env vars, documented production roadmap. Required for submission. [DONE]
+5. Pin dependencies (requirements.txt or pyproject.toml) so a judge can recreate the venv.
+6. Rehearse the 3–4 min script: cold SCN-002 or 001 with full seed, similar incident, SCN-003 false alarm, learning-curve tab.
+7. Record demo video + keep a recorded fallback run if Groq/Hindsight DNS flaps mid-live-demo.
+8. Optional P2: expose analyze_logs as its own tool (log_signatures already exist and are partially pulled into events).
