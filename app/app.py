@@ -136,7 +136,6 @@ def render_evidence_visualizations(events: list[dict], report: InvestigationRepo
     st.subheader("📊 Evidence Visualizations")
     rendered_any = False
 
-    # 1. Check trace events for tools returning charts
     for ev in events:
         if ev.get("kind") == "evidence":
             data = ev.get("data") or {}
@@ -147,15 +146,59 @@ def render_evidence_visualizations(events: list[dict], report: InvestigationRepo
                 render_chart_spec(chart)
                 rendered_any = True
 
-    # 2. Render charts directly from evidence finding numbers if trace charts were empty
     if not rendered_any:
-        for cause in report.root_causes:
-            if cause.evidence_ids:
-                st.markdown(f"**Root Cause Findings ({cause.cause_type})**")
-                st.write(cause.statement)
-
-    if not rendered_any and not report.root_causes:
         st.info("No numerical evidence charts generated for this run.")
+
+
+def render_memory_comparison_banner(report: InvestigationReport, events: list[dict]) -> None:
+    st.subheader("⚖️ Memory Impact Comparison (With vs Without Memory)")
+
+    scores = score_events(events)
+    if not report.root_causes:
+        st.info("No root cause met the confidence threshold for memory comparison.")
+        return
+
+    top_cause = report.root_causes[0]
+    values = scores.get(top_cause.hypothesis_id, {})
+    base_conf = without_memory(top_cause.confidence, values)
+    with_conf = top_cause.confidence
+    lift = round(with_conf - base_conf, 3)
+
+    col1, col2, col3, col4 = st.columns(4)
+    col1.metric("With Memory Confidence", f"{with_conf:.3f}")
+    col2.metric("Without Memory Confidence", f"{base_conf:.3f}")
+    col3.metric("Memory Lift Delta", f"{lift:+.3f}")
+    col4.metric("Recalled Memory Cases", len(report.similar_past_cases) if report.similar_past_cases else 0)
+
+    with st.container(border=True):
+        st.markdown("### Top Hypothesis Memory Comparison")
+        st.markdown(f"**Root Cause:** {top_cause.statement}")
+        st.markdown(f"**Cause Type:** `{top_cause.cause_type}`")
+
+        if lift > 0:
+            st.success(
+                f"🧠 **Memory Boosted Confidence by {lift:+.3f}**: "
+                f"Historical incident memory reinforced evidence support (from `{base_conf:.3f}` to `{with_conf:.3f}`)."
+            )
+        else:
+            st.info("ℹ️ Memory was neutral or uninfluenced for this hypothesis (no memory lift applied).")
+
+        # Table comparison of all root causes with vs without memory
+        comp_rows = []
+        for rc in report.root_causes:
+            rc_vals = scores.get(rc.hypothesis_id, {})
+            rc_base = without_memory(rc.confidence, rc_vals)
+            rc_lift = round(rc.confidence - rc_base, 3)
+            comp_rows.append({
+                "Hypothesis ID": rc.hypothesis_id,
+                "Cause Type": rc.cause_type,
+                "With Memory Score": f"{rc.confidence:.3f}",
+                "Without Memory Score": f"{rc.base_score:.3f}" if hasattr(rc, "base_score") else f"{rc_base:.3f}",
+                "Prior Lift Delta": f"{rc_lift:+.3f}",
+            })
+
+        if comp_rows:
+            st.dataframe(comp_rows, use_container_width=True)
 
 
 # --------------------------------------------------------------------------- #
@@ -170,6 +213,10 @@ def render_report(report: InvestigationReport, events: list[dict]) -> None:
     col4.metric("Tool Calls", report.tool_calls)
 
     st.write(report.summary)
+
+    # Top-Level Memory Comparison
+    st.divider()
+    render_memory_comparison_banner(report, events)
 
     # Render Visualizations
     st.divider()
@@ -192,8 +239,8 @@ def render_report(report: InvestigationReport, events: list[dict]) -> None:
             st.markdown(f"**Statement:** {cause.statement}")
 
             c1, c2, c3 = st.columns(3)
-            c1.metric("Confidence (With Memory)", f"{cause.confidence:.3f}")
-            c2.metric("Base Confidence (No Memory)", f"{base:.3f}")
+            c1.metric("With Memory Confidence", f"{cause.confidence:.3f}")
+            c2.metric("Without Memory Confidence", f"{base:.3f}")
             c3.metric("Memory Prior Lift", f"{lift:+.3f}")
 
     if report.ruled_out:
